@@ -1,4 +1,12 @@
 version: 2
 updates:
-  - { package-ecosystem: github-actions, directory: "/", schedule: { interval: weekly } }
-  - { package-ecosystem: pip, directory: "/", schedule: { interval: weekly } }
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule: { interval: monthly }
+    groups: { actions: { patterns: ["*"] } }
+  - package-ecosystem: pip
+    directory: "/"
+    schedule: { interval: monthly }
+    groups: { dependencies: { patterns: ["*"] } }
+    # Majors change what the SDK supports; take them by hand.
+    ignore: [{ dependency-name: "*", update-types: ["version-update:semver-major"] }]

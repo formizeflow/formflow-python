@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/formizeflow/formflow-python/actions/workflows/ci.yml/badge.svg)](https://github.com/formizeflow/formflow-python/actions/workflows/ci.yml)
 
-Small typed client for the FormFlow REST API. Standard library only, Python 3.9+. Tested in CI on Python 3.9 to 3.13.
+Small typed client for the FormFlow REST API. Standard library only, Python 3.10+. Tested in CI on Python 3.10 to 3.14.
 
 ```sh
 pip install formizeflow   # import name: formflow
