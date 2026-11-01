@@ -1,0 +1,13 @@
+node_modules/
+dist/
+.build/
+build/
+.gradle/
+.dart_tool/
+__pycache__/
+*.egg-info/
+local.properties
+.swiftpm/
+pubspec.lock
+*.tgz
+.DS_Store
