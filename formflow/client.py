@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import json
 import random
 import time
@@ -43,6 +44,15 @@ class Client:
         self.results = Results(self)
         self.payments = Payments(self)
         self.webhooks = Webhooks(self)
+        self.members = Members(self)
+        self.api_keys = ApiKeys(self)
+        self.audit_events = AuditEvents(self)
+        self.tables = Tables(self)
+        self.workflows = Workflows(self)
+        self.themes = Themes(self)
+        self.ai = Ai(self)
+        self.exports = Exports(self)
+        self.files = Files(self)
 
     def request(self, method: str, path: str, query: Optional[Mapping[str, Any]] = None, body: Any = None,
                 idempotency_key: Optional[str] = None) -> Any:
@@ -185,3 +195,155 @@ class Webhooks(_Resource):
     def create(self, url: str, events: List[str], form_id: Optional[str] = None) -> JSON:
         """The signing `secret` is returned once."""
         return self._c.data("POST", "/webhooks", body={"url": url, "events": events, "formId": form_id})
+
+
+class Members(_Resource):
+    def list(self) -> List[JSON]:
+        return self._c.data("GET", "/members")
+
+    def invite(self, email: str, role: str) -> JSON:
+        return self._c.data("POST", "/members", body={"email": email, "role": role})
+
+    def set_role(self, membership_id: str, role: str) -> JSON:
+        return self._c.data("PATCH", f"/members/{membership_id}", body={"role": role})
+
+    def remove(self, membership_id: str) -> None:
+        self._c.data("DELETE", f"/members/{membership_id}")
+
+
+class ApiKeys(_Resource):
+    def list(self) -> List[JSON]:
+        return self._c.data("GET", "/api-keys")
+
+    def create(self, name: str, scopes: List[str], expires_at: Optional[int] = None) -> JSON:
+        """The full `key` is returned once."""
+        return self._c.data("POST", "/api-keys", body={"name": name, "scopes": scopes, "expiresAt": expires_at})
+
+    def revoke(self, key_id: str) -> None:
+        self._c.data("DELETE", f"/api-keys/{key_id}")
+
+
+class AuditEvents(_Resource):
+    def list(self, **query: Any) -> Iterator[JSON]:
+        """action, resourceType, from, to (epoch ms or ISO 8601). Auto-paginates; each event has actorName."""
+        return self._c.paginate("/audit-events", **query)
+
+    def list_org(self, **query: Any) -> Iterator[JSON]:
+        """Every workspace of the organization. Org owners and admins only."""
+        return self._c.paginate("/org/audit-events", **query)
+
+    def export(self, format: str = "csv", scope: str = "workspace", **filter: Any) -> JSON:
+        """Starts a CSV or JSON export; poll it with exports.get or exports.wait."""
+        return self._c.data("POST", "/audit-events/export", body={"format": format, "scope": scope, **filter})
+
+
+class Tables(_Resource):
+    def list(self) -> List[JSON]:
+        return self._c.data("GET", "/tables")
+
+    def get(self, table_id: str) -> JSON:
+        return self._c.data("GET", f"/tables/{table_id}")
+
+    def create(self, name: str, columns: List[JSON]) -> JSON:
+        return self._c.data("POST", "/tables", body={"name": name, "columns": columns})
+
+    def update(self, table_id: str, **patch: Any) -> JSON:
+        return self._c.data("PATCH", f"/tables/{table_id}", body=patch)
+
+    def delete(self, table_id: str) -> None:
+        self._c.data("DELETE", f"/tables/{table_id}")
+
+    def rows(self, table_id: str, **query: Any) -> Iterator[JSON]:
+        return self._c.paginate(f"/tables/{table_id}/rows", **query)
+
+    def add_rows(self, table_id: str, rows: Any) -> List[JSON]:
+        """One row (a dict) or a list of rows."""
+        return self._c.data("POST", f"/tables/{table_id}/rows", body=rows)
+
+    def update_row(self, table_id: str, row_id: str, cells: JSON) -> JSON:
+        return self._c.data("PATCH", f"/tables/{table_id}/rows/{row_id}", body=cells)
+
+    def delete_row(self, table_id: str, row_id: str) -> None:
+        self._c.data("DELETE", f"/tables/{table_id}/rows/{row_id}")
+
+
+class Workflows(_Resource):
+    def list(self, form_id: Optional[str] = None) -> List[JSON]:
+        return self._c.data("GET", "/workflows", query={"formId": form_id})
+
+    def get(self, workflow_id: str) -> JSON:
+        return self._c.data("GET", f"/workflows/{workflow_id}")
+
+    def create(self, **body: Any) -> JSON:
+        return self._c.data("POST", "/workflows", body=body)
+
+    def update(self, workflow_id: str, **patch: Any) -> JSON:
+        return self._c.data("PATCH", f"/workflows/{workflow_id}", body=patch)
+
+    def delete(self, workflow_id: str) -> None:
+        self._c.data("DELETE", f"/workflows/{workflow_id}")
+
+    def executions(self, workflow_id: str) -> List[JSON]:
+        return self._c.data("GET", f"/workflows/{workflow_id}/executions")
+
+
+class Themes(_Resource):
+    def list(self) -> List[JSON]:
+        return self._c.data("GET", "/themes")
+
+    def presets(self) -> List[JSON]:
+        return self._c.data("GET", "/themes/presets")
+
+    def get(self, theme_id: str) -> JSON:
+        return self._c.data("GET", f"/themes/{theme_id}")
+
+    def create(self, name: str, definition: JSON) -> JSON:
+        return self._c.data("POST", "/themes", body={"name": name, "definition": definition})
+
+    def update(self, theme_id: str, **patch: Any) -> JSON:
+        return self._c.data("PATCH", f"/themes/{theme_id}", body=patch)
+
+    def delete(self, theme_id: str) -> None:
+        self._c.data("DELETE", f"/themes/{theme_id}")
+
+
+class Ai(_Resource):
+    def generate_form(self, prompt: str, **opts: Any) -> JSON:
+        """Prompt to a validated form definition. opts: presentation, audience, create={"name": ..., "folderId": ...}. Uses AI credits."""
+        return self._c.data("POST", "/ai/generate-form", body={"prompt": prompt, **opts})
+
+
+class Exports(_Resource):
+    def get(self, export_id: str) -> JSON:
+        return self._c.data("GET", f"/exports/{export_id}")
+
+    def wait(self, export_id: str, interval: float = 1.5, timeout: float = 120.0) -> JSON:
+        """Polls until the export is done or failed; `url` is a short-lived download link when done."""
+        waited = 0.0
+        while True:
+            job = self.get(export_id)
+            if job["export"]["status"] in ("done", "failed"):
+                return job
+            if waited >= timeout:
+                raise TimeoutError(f"export {export_id} did not finish in {timeout}s")
+            self._c._sleep(interval)
+            waited += interval
+
+
+class Files(_Resource):
+    """The workspace media library (images, video, fonts)."""
+
+    def list(self, **query: Any) -> JSON:
+        """search, kind (image|video|font), cursor. Returns {"data": [...], "nextCursor": ...}."""
+        return self._c.request("GET", "/media", query=query)
+
+    def upload(self, filename: str, content: Optional[bytes] = None, from_url: Optional[str] = None, **meta: Any) -> JSON:
+        """Upload bytes (about 1.3 MB; larger files use multipart POST /api/media) or have the server fetch a public from_url."""
+        if (content is None) == (from_url is None):
+            raise ValueError("pass exactly one of content and from_url")
+        body: JSON = {"filename": filename, **meta}
+        if content is not None:
+            body["contentBase64"] = base64.b64encode(content).decode("ascii")
+        else:
+            body["fromUrl"] = from_url
+        return self._c.data("POST", "/media", body=body)

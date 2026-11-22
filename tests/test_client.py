@@ -91,5 +91,48 @@ class WebhookTests(unittest.TestCase):
             construct_event("s", self.body, "t=1,v1=00")
 
 
+class ResourceTests(unittest.TestCase):
+    def client(self, responses, calls):
+        return Client("ff_test", base_url="https://x.test", transport=scripted(responses, calls), sleep=lambda s: calls.append(("sleep", s)))
+
+    def test_members_and_api_keys(self):
+        calls = []
+        c = self.client([(200, {"data": [{"userId": "u1"}]}, {}), (200, {"data": {"key": "ff_live_x"}}, {}), (204, None, {})], calls)
+        self.assertEqual(c.members.list(), [{"userId": "u1"}])
+        self.assertEqual(c.api_keys.create("ci", ["form:read"])["key"], "ff_live_x")
+        c.members.remove("mem_1")
+        self.assertEqual(json.loads(calls[1][3]), {"name": "ci", "scopes": ["form:read"], "expiresAt": None})
+        self.assertEqual((calls[2][0], calls[2][1]), ("DELETE", "https://x.test/api/v1/members/mem_1"))
+
+    def test_audit_events_paginate_and_org_and_export(self):
+        calls = []
+        c = self.client([(200, {"data": [{"id": "a1"}], "nextCursor": "c1"}, {}), (200, {"data": [{"id": "a2"}], "nextCursor": None}, {}),
+                         (200, {"data": []}, {}), (202, {"data": {"export": {"id": "exp_1"}}}, {})], calls)
+        self.assertEqual([e["id"] for e in c.audit_events.list(action="form.published")], ["a1", "a2"])
+        self.assertIn("cursor=c1", calls[1][1])
+        list(c.audit_events.list_org())
+        self.assertEqual(calls[2][1], "https://x.test/api/v1/org/audit-events")
+        self.assertEqual(c.audit_events.export("json", scope="org")["export"]["id"], "exp_1")
+        self.assertEqual(json.loads(calls[3][3]), {"format": "json", "scope": "org"})
+
+    def test_exports_wait_polls_until_done(self):
+        calls = []
+        running, done = {"data": {"export": {"status": "running"}}}, {"data": {"export": {"status": "done"}, "url": "https://x.test/f"}}
+        c = self.client([(200, running, {}), (200, done, {})], calls)
+        self.assertEqual(c.exports.wait("exp_1")["url"], "https://x.test/f")
+        self.assertIn(("sleep", 1.5), calls)
+
+    def test_tables_ai_files(self):
+        calls = []
+        c = self.client([(200, {"data": [{"id": "r1"}]}, {}), (200, {"data": {"definition": {}}}, {}), (200, {"data": {"url": "/m/1"}}, {})], calls)
+        c.tables.add_rows("tbl_1", [{"a": 1}])
+        c.ai.generate_form("a survey", audience="staff")
+        c.files.upload("a.txt", content=b"hi")
+        self.assertEqual(json.loads(calls[1][3]), {"prompt": "a survey", "audience": "staff"})
+        self.assertEqual(json.loads(calls[2][3])["contentBase64"], "aGk=")
+        with self.assertRaises(ValueError):
+            c.files.upload("a.txt")
+
+
 if __name__ == "__main__":
     unittest.main()

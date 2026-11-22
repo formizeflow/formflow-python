@@ -26,6 +26,22 @@ for sub in ff.submissions.list(form["id"], status="completed"):   # pages automa
 - **Errors**: `FormFlowError` with `status`, `code`, `message`, `details` (publish failures list `details["issues"]`), `request_id`, `retry_after`.
 - **Anything not wrapped**: `ff.data("POST", "/approvals/apr_1/cancel", body={})` or `ff.request(...)`. The spec is `openapi.json`.
 
+## Resources
+
+`ff.forms`, `ff.submissions`, `ff.results`, `ff.payments`, `ff.webhooks`, plus:
+
+```python
+ff.members.invite("ada@example.com", "editor"); ff.members.set_role("mem_1", "admin")
+key = ff.api_keys.create("ci", ["form:read", "submission:read"])["key"]   # shown once
+for ev in ff.audit_events.list(action="form.published"): print(ev["actorName"], ev["action"])
+job = ff.audit_events.export("csv", scope="org")            # org owners and admins
+print(ff.exports.wait(job["export"]["id"])["url"])
+table = ff.tables.create("Venues", [{"id": "name", "label": "Name", "type": "text"}]); ff.tables.add_rows(table["id"], [{"name": "Hall"}])
+ff.workflows.list(form_id); ff.themes.list()
+draft = ff.ai.generate_form("Customer feedback survey", create={"name": "Feedback"})
+asset = ff.files.upload("logo.png", content=open("logo.png", "rb").read())   # media library
+```
+
 ## Webhooks
 
 ```python
